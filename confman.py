@@ -8,6 +8,7 @@ import os
 import pathlib
 import sys
 import toml
+import shutil
 
 
 CONFIG_PATH_SUFFIX = ".config/confman"
@@ -19,6 +20,7 @@ NOT_CONFIGURED = "NOT CONFIGURED"
 
 
 def ensure_config_dir():
+    """Ensure that the config directory exists, and if not creates it"""
     if os.path.isdir(GROUPS_PATH):
         logging.debug(f"Found {GROUPS_PATH}")
     else:
@@ -34,17 +36,20 @@ def ensure_config_dir():
 
 
 def confirm_call(func, *args):
+    """Call a function with given arguments after making user confirm"""
     print(
-        f"OK to call '{func.__name__}' with args {args}? This might delete or destroy the file/folder."
+        f"OK to call function '{func.__name__}' with args {args}? This might delete or destroy the file/folder."
     )
     if input("y/N").lower() == "y":
         func(*args)
         return
 
-    exit()
+    logging.critical("Function call aborted, exitting")
+    sys.exit()
 
 
 def validate_name(name):
+    """Ensure that a name is valid (letters, numbers, and _ only)"""
     for c in name:
         if not (c.isalnum() or c == "_"):
             logging.critical(
@@ -53,9 +58,17 @@ def validate_name(name):
             sys.exit(1)
 
 
-def command_new(name, dest_path):
+def get_group_path(name: str) -> str:
+    """Get the path to a group given the name of the group"""
     validate_name(name)
     group_path = os.path.join(GROUPS_PATH, name)
+    return group_path
+
+
+def command_new(name: str, dest_path: str):
+    """Creates a new group given the name"""
+    validate_name(name)
+    group_path = get_group_path(name)
     group_cfg_path = os.path.join(group_path, GROUP_CFG_FN)
 
     if not group_path.endswith("/"):
@@ -82,6 +95,19 @@ def command_new(name, dest_path):
     else:
         if os.path.exists(dest_path):
             print(f"File exists at {dest_path}")
+
+
+def command_delete(name: str):
+    """Deletes a group given the name"""
+    validate_name(name)
+    group_path = get_group_path(name)
+    if os.path.exists(group_path):
+        print(f"Removing group {name} (at {group_path})")
+        confirm_call(shutil.rmtree, group_path)
+    else:
+        logging.critical(
+            f"Group {name} doesn't exist (no folder exists at {group_path})"
+        )
 
 
 def main():
@@ -118,6 +144,16 @@ def main():
         default=NOT_CONFIGURED,
     )
 
+    delete_parser = subparsers.add_parser(
+        "delete",
+        help="delete a group of configs",
+    )
+    delete_parser.add_argument(
+        "name",
+        help="the name of the group to be deleted",
+        type=str,
+    )
+
     args = ap.parse_args()
 
     if args.debug:
@@ -132,8 +168,11 @@ def main():
 
     ensure_config_dir()
 
-    if args.command == "new":
-        command_new(args.name, args.dest)
+    match args.command:
+        case "new":
+            command_new(args.name, args.dest)
+        case "delete":
+            command_delete(args.name)
 
 
 if __name__ == "__main__":
