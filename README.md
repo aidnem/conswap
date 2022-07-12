@@ -27,8 +27,20 @@ The currently implemented commands are:
 
 * `new` - Create a new group
 
+  Usage: `<confman> new <name>`
+
+  Arguments:
+    * `<name>` - the name of the group
+
   Options:
     * `--dest` (`-d`) - Change the destination path, where the files will be swapped to.
 
   **Note: options for subcommands must be placed *after* the subcommand itself.**
+
+* `delete` - Remove a group
+
+  Usage: `<confman> delete <name>`
+
+  Arguments:
+    * `<name>` - the name of the group being deleted
 
