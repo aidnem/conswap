@@ -7,6 +7,7 @@ from argparse import ArgumentParser
 import os
 import pathlib
 import sys
+from typing import Callable
 import toml
 import shutil
 
@@ -35,38 +36,59 @@ def ensure_config_dir():
             sys.exit()
 
 
-def confirm_call(func, *args):
+def confirm(prompt: str) -> bool:
+    """Prompt a user to confirm"""
+    return input(f"{prompt}\n[y/N]").lower() == "y"
+
+
+def confirm_call(func: Callable, *args, auto_exit=True):
     """Call a function with given arguments after making user confirm"""
-    print(
+    if confirm(
         f"OK to call function '{func.__name__}' with args {args}? This might delete or destroy the file/folder."
-    )
-    if input("y/N").lower() == "y":
+    ):
         func(*args)
-        return
+        return True
 
-    logging.critical("Function call aborted, exitting")
-    sys.exit()
+    if auto_exit:
+        logging.critical("Function call aborted, exitting")
+        sys.exit()
+    else:
+        print("Function call cancelled")
+        sys.exit()
 
 
-def validate_name(name):
+def validate_name(name, auto_exit=True):
     """Ensure that a name is valid (letters, numbers, and _ only)"""
     for c in name:
         if not (c.isalnum() or c == "_"):
             logging.critical(
                 f"Character {c} is not allowed in group name (must be letters, numbers, or '_')"
             )
-            sys.exit(1)
+            if auto_exit:
+                sys.exit(1)
+            else:
+                return False
+
+    return True
+
+
+def expand_path(path: str) -> str:
+    """Fully expand a path, including expanding relative paths, paths starting with '~', and $VARIABLES"""
+    return os.path.abspath(os.path.expanduser(os.path.expandvars(path)))
 
 
 def get_group_path(name: str) -> str:
     """Get the path to a group given the name of the group"""
     validate_name(name)
     group_path = os.path.join(GROUPS_PATH, name)
+    print(group_path)
     return group_path
 
 
 def command_new(name: str, dest_path: str):
     """Creates a new group given the name"""
+    dest_path = expand_path(dest_path)
+
     validate_name(name)
     group_path = get_group_path(name)
     group_cfg_path = os.path.join(group_path, GROUP_CFG_FN)
@@ -93,8 +115,49 @@ def command_new(name: str, dest_path: str):
         logging.warning("Destination folder not configured")
         print(f"Make sure to configure it in {group_cfg_path} before using this group")
     else:
+        print(dest_path)
         if os.path.exists(dest_path):
             print(f"File exists at {dest_path}")
+            chosen = False
+            while not chosen:
+                choice = input(
+                    "(i)nstall existing config into groups folder, (d)elete the existing file/folder, or (a)bort?"
+                )
+
+                match choice.lower():
+                    case "i":
+                        chosen = True
+                        name_valid = False
+                        current_name = ""
+                        while not name_valid:
+                            current_name = input(
+                                "What should this config be installed as?\n>"
+                            )
+                            name_valid = validate_name(current_name, auto_exit=False)
+
+                        installed_path = os.path.join(group_path, current_name)
+                        confirm_call(shutil.move, dest_path, installed_path)
+
+                    case "d":
+                        chosen = True
+                        confirm_call(shutil.rmtree, dest_path)
+                    case "a":
+                        chosen = True
+                        print("Aborting")
+                        print("WARNING: Aborting now leaves a group config behind.")
+                        print(
+                            "There is a file at this config's destination, causing it to error if used."
+                        )
+                        print(
+                            "You can either choose to delete the group now, or keep the group, and remove"
+                        )
+                        print(
+                            "The file/folder at the group's destination manually before using."
+                        )
+                        if confirm("Delete group?"):
+                            confirm_call(shutil.rmtree, group_path)
+                    case "_":
+                        print("Please choose i, d, or a")
 
 
 def command_delete(name: str):
