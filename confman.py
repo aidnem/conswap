@@ -234,10 +234,15 @@ def command_swap(group: str, config: str):
     group_cfg_data = toml.load(group_cfg_path)
     if not "dest_path" in group_cfg_data:
         logging.critical(f"Field 'dest_path' is not defined in group.toml")
-        print("Please set it")
+        print(f"Please set it in {group_cfg_path}")
         print("exitting.")
         return
     dest_path = group_cfg_data["dest_path"]
+    if dest_path == NOT_CONFIGURED:
+        logging.critical(f"Field 'dest_path' is not configured in group.toml")
+        print(f"Please set it in {group_cfg_path}")
+        print("exitting.")
+        return
     if os.path.exists(dest_path):
         if os.path.islink(dest_path):
             print("Found previously swapped config; removing it.")
