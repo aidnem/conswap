@@ -16,9 +16,12 @@ CONFIG_PATH_SUFFIX = ".config/confman"
 GROUPS_SUFFIX = "groups"
 CONFIG_PATH = os.path.join(pathlib.Path.home(), CONFIG_PATH_SUFFIX)
 GROUPS_PATH = os.path.join(CONFIG_PATH, GROUPS_SUFFIX)
-GROUP_CFG_FN = "group.toml"
 NOT_CONFIGURED = "NOT CONFIGURED"
-
+GROUP_CFG_FN = "group.toml"
+GROUP_CFG_DATA = {
+    "desc"     : "", # Group description
+    "dest_path": NOT_CONFIGURED, # Group swap destination
+}
 
 def ensure_config_dir():
     """Ensure that the config directory exists, and if not creates it"""
@@ -96,7 +99,7 @@ def get_group_path(name: str) -> str:
     return expand_path_safe(group_path)
 
 
-def command_new(name: str, dest_path: str):
+def command_new(name: str, dest_path: str, group_desc: str):
     """Creates a new group given the name"""
     dest_path = expand_path_safe(dest_path)
 
@@ -113,9 +116,9 @@ def command_new(name: str, dest_path: str):
 
     os.makedirs(group_path)
 
-    group_cfg_data = {
-        "dest_path": dest_path,
-    }
+    group_cfg_data = GROUP_CFG_DATA.copy()
+    group_cfg_data["dest_path"] = dest_path
+    group_cfg_data["desc"]      = group_desc
 
     logging.debug(f"Creating group cfg file at {group_cfg_path}")
     with open(group_cfg_path, "w+") as f:
@@ -188,22 +191,90 @@ def command_delete(name: str):
             f"Group {name} doesn't exist (no folder exists at {group_path})"
         )
 
-def command_list():
+def command_list(verbose: bool):
     """List all of the existing groups"""
     for group in os.listdir(GROUPS_PATH):
         group_path = os.path.join(GROUPS_PATH, group)
         configs_count = 0
         has_group_config = False
+        group_cfg_data = {"desc": "", "dest_path": NOT_CONFIGURED}
         for config in os.listdir(group_path):
             if config == "group.toml":
                 has_group_config = True
+                group_cfg_data = toml.load(os.path.join(group_path, "group.toml"))
             else:
                 configs_count += 1
-        print(f"* ({group}): {configs_count} config(s)", end="")
+
+        msg = f"* {group} | desc: '{group_cfg_data['desc']}' | config(s): {configs_count}"
+        if verbose:
+            msg += f" | swap dest: '{group_cfg_data['dest_path']}'"
+
+        print(msg, end="")
+
         if not has_group_config:
             print(" | Warning: group is missing 'group.toml' file")
         else:
             print("") # Add the newline that we were missing from earlier
+
+def command_fix(verbose: bool):
+    """Fix missing fields in 'group.toml' files"""
+    for group in os.listdir(GROUPS_PATH):
+        if verbose:
+            print(f"Fixing {group}...")
+        group_path = os.path.join(GROUPS_PATH, group)
+        changes_made = False
+        group_cfg_path = os.path.join(group_path, GROUP_CFG_FN)
+        try:
+            group_cfg_data = toml.load(group_cfg_path)
+        except FileNotFoundError:
+            if verbose:
+                print(f"No config file was found at {group_cfg_path}. Creating it.")
+            changes_made = True
+            group_cfg_data = GROUP_CFG_DATA.copy()
+        for key, value in GROUP_CFG_DATA.items():
+            if not key in group_cfg_data:
+                if verbose:
+                    print(f"Field {key} not found. Adding it.")
+                group_cfg_data[key] = value
+                changes_made = True
+
+        if changes_made:
+            if verbose:
+                print(f"Writing fixes for '{group_cfg_path}'.")
+            with open(group_cfg_path, "w+") as f:
+                toml.dump(group_cfg_data, f)
+        else:
+            if verbose:
+                print(f"No fixes were found for group {group}.")
+
+def command_configure(group: str):
+    group_path = os.path.join(GROUPS_PATH, group)
+    group_cfg_path = os.path.join(group_path, GROUP_CFG_FN)
+    try:
+        group_cfg_data = toml.load(group_cfg_path)
+    except FileNotFoundError:
+        logging.critical(f"No config file was found at {group_cfg_path}")
+        print("Try running\n    $ [confman] fix\nto automatically create it")
+        sys.exit(1)
+
+    print("Welcome to the confman group configuration wizard.")
+    print("For each field in the group.toml file, you will be prompted to either:")
+    print("    * Type a new value and press enter")
+    print("    * Press ctrl+d to keep the value the same")
+    for key in group_cfg_data:
+        value = group_cfg_data[key]
+        print(f"'{key}'='{value}'")
+        try:
+            new_value = input(">")
+            print(f"Updated: '{key}'='{new_value}'")
+        except EOFError:
+            new_value = value
+            print("[ctrl+d]\nValue not updated")
+        group_cfg_data[key] = new_value
+
+    print(f"Configuration complete. Writing to {group_cfg_path}")
+    with open(group_cfg_path, "w") as f:
+        toml.dump(group_cfg_data, f)
 
 def command_swap(group: str, config: str):
     """Swap configs for a certain group"""
@@ -317,11 +388,19 @@ def main():
         type=str,
     )
     new_parser.add_argument(
-        "-d",
+        "-dt",
         "--dest",
         help="path that files will be swapped to",
         type=str,
         default=NOT_CONFIGURED,
+    )
+
+    new_parser.add_argument(
+        "-dc",
+        "--desc",
+        help="group description (optional)",
+        type=str,
+        default="",
     )
 
     delete_parser = subparsers.add_parser(
@@ -336,7 +415,37 @@ def main():
 
     list_parser = subparsers.add_parser(
         "list",
-        help="list existing groups"
+        help="list existing groups",
+    )
+
+    list_parser.add_argument(
+        "-v",
+        "--verbose",
+        help="make the list command show more details",
+        action="store_true",
+    )
+
+    fix_parser = subparsers.add_parser(
+        "fix",
+        help="automatically fill in missing fields in 'group.toml' files"
+    )
+
+    fix_parser.add_argument(
+        "-v",
+        "--verbose",
+        help="make the fix command show more details",
+        action="store_true",
+    )
+
+    configure_parser = subparsers.add_parser(
+        "configure",
+        help="configure settings of a group"
+    )
+
+    configure_parser.add_argument(
+        "name",
+        help="the name of the group to configure",
+        type=str,
     )
 
     swap_parser = subparsers.add_parser(
@@ -368,17 +477,30 @@ def main():
 
     ensure_config_dir()
 
-    match args.command:
-        case "new":
-            command_new(args.name, args.dest)
-        case "delete":
-            command_delete(args.name)
-        case "list":
-            command_list()
-        case "swap":
-            command_swap(args.group, args.config)
-        case _:
-            assert False, f"Unreachable [command {args.command}](please report this issue on github)"
+    try:
+        match args.command:
+            case "new":
+                command_new(args.name, args.dest, args.desc)
+            case "delete":
+                command_delete(args.name)
+            case "list":
+                command_list(args.verbose)
+            case "fix":
+                command_fix(args.verbose)
+            case "configure":
+                command_configure(args.name)
+            case "swap":
+                command_swap(args.group, args.config)
+            case _:
+                assert False, f"Unreachable [command {args.command}](please report this issue on github)"
+    except KeyError:
+        logging.critical(f"Subcommand {args.command} crashed.")
+        print("It appears that one or more group has a malformed 'group.toml' file.")
+        print("Try running\n    $ [confman] fix\nto add missing fields to config files.")
+        print("After running `fix`, you can (optionally) run\n    $ [confman] configure <group>")
+        print("to manually set the fields in the group's 'group.toml' file.")
+        print("Don't worry, this error is completely normal after a confman update.")
+        print("This also might have occurred because you made a mistake manually editing the file.")
 
 
 if __name__ == "__main__":
