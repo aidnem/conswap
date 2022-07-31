@@ -497,6 +497,8 @@ def main():
         logging.critical(f"Subcommand {args.command} crashed.")
         print("It appears that one or more group has a malformed 'group.toml' file.")
         print("Try running\n    $ [confman] fix\nto add missing fields to config files.")
+        print("After running `fix`, you can (optionally) run\n    $ [confman] configure <group>")
+        print("to manually set the fields in the group's 'group.toml' file.")
         print("Don't worry, this error is completely normal after a confman update.")
         print("This also might have occurred because you made a mistake manually editing the file.")
 
