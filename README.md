@@ -13,6 +13,8 @@ Options:
 
 * `--help` (`-h`) - Print help message and quit
 
+> The `-h` option exists for every subcommand as well.
+
 * `--debug` (`-d`) - Print debug messages
 
 
@@ -33,7 +35,8 @@ The currently implemented commands are:
     * `<name>` - the name of the group
 
   Options:
-    * `--dest` (`-d`) - Change the destination path, where the files will be swapped to.
+    * `--dest` (`-dt`) - Change the destination path, where the files will be swapped to.
+    * `--desc` (`-dc`) - Change the group description, which will show up in the `list` command.
 
   **Note: options for subcommands must be placed *after* the subcommand itself.**
 
@@ -43,4 +46,33 @@ The currently implemented commands are:
 
   Arguments:
     * `<name>` - the name of the group being deleted
+
+* `list` - List existing groups
+
+  Usage `<confman> list`
+
+  Arguments:
+    * `--verbose` (`-v`) - Display swap destination for each group in addition to other info.
+
+* `fix` - Fix broken 'group.toml'files
+
+  Usage `<confman> fix`
+
+  Arguments:
+    * `--verbose` (`-v`) - Print detailed messages for each fix made.
+
+* `configure` - Configure a group (set fields in a specific group's 'group.toml' file)
+
+  Usage: `<confman> configure <group>`
+
+  Arguments:
+    * `<name>` - Name of the group to configure
+
+* `swap` - Swap between configs for a specific group
+
+  Usage: `<confman> swap <group> <config>`
+
+  Arguments:
+    * `<group>` - Which group to swap configs for
+    * `<config>` - Which config to swap to
 
