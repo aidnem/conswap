@@ -202,6 +202,14 @@ def dir_size(path: str):
 
     return total_size
 
+def size_fmt(bytes: int):
+    size:float = float(bytes)
+    for unit in ["", "K", "M", "G", "T", "P", "E", "Z"]:
+        if abs(size) < 1024.0:
+            return f"{size:3.1f}{unit}B"
+        size /= 1024.0
+    return f"{size:.1f}YB"
+
 def command_list(group: str|None):
     """List all of the existing groups"""
     if group is None:
@@ -244,7 +252,7 @@ def command_list(group: str|None):
                 if config == ".DS_Store": continue
                 config_path = os.path.join(group_path, config)
                 config_size = dir_size(config_path)
-                outstr += f" * {config} @ {config_path} : {config_size} bytes\n"
+                outstr += f" * {config} @ {config_path} : {size_fmt(config_size)}\n"
                 configs_count += 1
 
         msg = group
