@@ -1,13 +1,16 @@
-# confman
+# conswap
 A config manager/swapper written in python
 
-Confman is under development so it may be buggy and things may change.
+> conswap used to be named confman, but was renamed due to the existence of
+other projects under the same name.
+
+conswap is under development so it may be buggy and things may change.
 
 ## Installation
 To install, simply clone the repo.
 
 ## Usage
-To run confman, run `confman.py` with python 3.10.
+To run conswap, run `conswap.py` with python 3.10.
 
 Options:
 
@@ -18,18 +21,18 @@ Options:
 * `--debug` (`-d`) - Print debug messages
 
 
-The first time confman is run, it will create the folders `~/.config/confman/` and `~/.config/confman/groups/`
-Any confman related files will be kept in `~/.config/confman`.
-Groups will be kept in `~/.config/confman/groups/`.
+The first time conswap is run, it will create the folders `~/.config/conswap/` and `~/.config/conswap/groups/`
+Any conswap related files will be kept in `~/.config/conswap`.
+Groups will be kept in `~/.config/conswap/groups/`.
 
 ### Commands
-Confman needs to be run with a command to actually do anything.
+conswap needs to be run with a command to actually do anything.
 
 The currently implemented commands are:
 
 * `new` - Create a new group
 
-  Usage: `<confman> new <name>`
+  Usage: `<conswap> new <name>`
 
   Arguments:
     * `<name>` - the name of the group
@@ -42,35 +45,35 @@ The currently implemented commands are:
 
 * `delete` - Remove a group
 
-  Usage: `<confman> delete <name>`
+  Usage: `<conswap> delete <name>`
 
   Arguments:
     * `<name>` - the name of the group being deleted
 
 * `list` - List existing groups
 
-  Usage `<confman> list`
+  Usage `<conswap> list`
 
   Arguments:
     * `--verbose` (`-v`) - Display swap destination for each group in addition to other info.
 
 * `fix` - Fix broken 'group.toml'files
 
-  Usage `<confman> fix`
+  Usage `<conswap> fix`
 
   Arguments:
     * `--verbose` (`-v`) - Print detailed messages for each fix made.
 
 * `configure` - Configure a group (set fields in a specific group's 'group.toml' file)
 
-  Usage: `<confman> configure <group>`
+  Usage: `<conswap> configure <group>`
 
   Arguments:
     * `<name>` - Name of the group to configure
 
 * `swap` - Swap between configs for a specific group
 
-  Usage: `<confman> swap <group> <config>`
+  Usage: `<conswap> swap <group> <config>`
 
   Arguments:
     * `<group>` - Which group to swap configs for

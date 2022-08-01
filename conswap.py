@@ -12,7 +12,7 @@ import toml
 import shutil
 
 
-CONFIG_PATH_SUFFIX = ".config/confman"
+CONFIG_PATH_SUFFIX = ".config/conswap"
 GROUPS_SUFFIX = "groups"
 CONFIG_PATH = os.path.join(pathlib.Path.home(), CONFIG_PATH_SUFFIX)
 GROUPS_PATH = os.path.join(CONFIG_PATH, GROUPS_SUFFIX)
@@ -254,10 +254,10 @@ def command_configure(group: str):
         group_cfg_data = toml.load(group_cfg_path)
     except FileNotFoundError:
         logging.critical(f"No config file was found at {group_cfg_path}")
-        print("Try running\n    $ [confman] fix\nto automatically create it")
+        print("Try running\n    $ [conswap] fix\nto automatically create it")
         sys.exit(1)
 
-    print("Welcome to the confman group configuration wizard.")
+    print("Welcome to the conswap group configuration wizard.")
     print("For each field in the group.toml file, you will be prompted to either:")
     print("    * Type a new value and press enter")
     print("    * Press ctrl+d to keep the value the same")
@@ -363,7 +363,7 @@ def command_swap(group: str, config: str):
 
 def main():
     ap = ArgumentParser(
-        prog="confman", description="manage and swap configuration files"
+        prog="conswap", description="manage and swap configuration files"
     )
     ap.add_argument(
         "-d",
@@ -496,10 +496,10 @@ def main():
     except KeyError:
         logging.critical(f"Subcommand {args.command} crashed.")
         print("It appears that one or more group has a malformed 'group.toml' file.")
-        print("Try running\n    $ [confman] fix\nto add missing fields to config files.")
-        print("After running `fix`, you can (optionally) run\n    $ [confman] configure <group>")
+        print("Try running\n    $ [conswap] fix\nto add missing fields to config files.")
+        print("After running `fix`, you can (optionally) run\n    $ [conswap] configure <group>")
         print("to manually set the fields in the group's 'group.toml' file.")
-        print("Don't worry, this error is completely normal after a confman update.")
+        print("Don't worry, this error is completely normal after a conswap update.")
         print("This also might have occurred because you made a mistake manually editing the file.")
 
 
