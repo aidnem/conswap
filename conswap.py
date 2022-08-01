@@ -192,30 +192,68 @@ def command_delete(name: str):
             f"Group {name} doesn't exist (no folder exists at {group_path})"
         )
 
-def command_list(verbose: bool):
+def dir_size(path: str):
+    total_size = 0
+    for dirpath, dirnames, filenames in os.walk(path):
+        for f in filenames:
+            fp = os.path.join(dirpath, f)
+            if not os.path.islink(fp):
+                total_size += os.path.getsize(fp)
+
+    return total_size
+
+def command_list(group: str|None):
     """List all of the existing groups"""
-    for group in os.listdir(GROUPS_PATH):
+    if group is None:
+        for group in os.listdir(GROUPS_PATH):
+            if group == ".DS_Store": continue
+            group_path = os.path.join(GROUPS_PATH, group)
+            configs_count = 0
+            has_group_config = False
+            group_cfg_data = {"desc": "", "dest_path": NOT_CONFIGURED}
+            for config in os.listdir(group_path):
+                if config == "group.toml":
+                    has_group_config = True
+                    group_cfg_data = toml.load(os.path.join(group_path, "group.toml"))
+                else:
+                    configs_count += 1
+
+            msg = f"* {group}"
+            if (desc:=group_cfg_data['desc']) != "":
+                msg+= f" - {desc}"
+            msg += f" | {configs_count} config(s)"
+            msg += f" @ {group_path}"
+            msg += f" \N{RIGHTWARDS ARROW} swaps to {group_cfg_data['dest_path']}"
+
+            print(msg, end="")
+
+            if not has_group_config:
+                print(" | Warning: group is missing 'group.toml' file")
+            else:
+                print("") # Add the newline that we were missing from earlier
+    else:
         group_path = os.path.join(GROUPS_PATH, group)
-        configs_count = 0
-        has_group_config = False
         group_cfg_data = {"desc": "", "dest_path": NOT_CONFIGURED}
+        configs_count = 0
+        outstr = ""
         for config in os.listdir(group_path):
             if config == "group.toml":
                 has_group_config = True
                 group_cfg_data = toml.load(os.path.join(group_path, "group.toml"))
             else:
+                if config == ".DS_Store": continue
+                config_path = os.path.join(group_path, config)
+                config_size = dir_size(config_path)
+                outstr += f" * {config} @ {config_path} : {config_size} bytes\n"
                 configs_count += 1
 
-        msg = f"* {group} | desc: '{group_cfg_data['desc']}' | config(s): {configs_count}"
-        if verbose:
-            msg += f" | swap dest: '{group_cfg_data['dest_path']}'"
-
+        msg = group
+        if (desc:=group_cfg_data['desc']) != "":
+            msg+= f" - {desc}"
+        msg += f" \N{RIGHTWARDS ARROW} swaps to {group_cfg_data['dest_path']}"
+        msg += f"\n{configs_count} config(s):"
+        msg += f"\n{outstr}"
         print(msg, end="")
-
-        if not has_group_config:
-            print(" | Warning: group is missing 'group.toml' file")
-        else:
-            print("") # Add the newline that we were missing from earlier
 
 def command_fix(verbose: bool):
     """Fix missing fields in 'group.toml' files"""
@@ -445,6 +483,12 @@ def main():
     )
 
     list_parser.add_argument(
+        "-g",
+        "--group",
+        help="group to list configs for (none means list groups)",
+    )
+
+    list_parser.add_argument(
         "-v",
         "--verbose",
         help="make the list command show more details",
@@ -532,7 +576,7 @@ def main():
             case "delete":
                 command_delete(args.name)
             case "list":
-                command_list(args.verbose)
+                command_list(args.group)
             case "fix":
                 command_fix(args.verbose)
             case "configure":

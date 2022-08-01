@@ -50,12 +50,12 @@ The currently implemented commands are:
   Arguments:
     * `<name>` - the name of the group being deleted
 
-* `list` - List existing groups
+* `list` - List existing groups or configs in a group
 
   Usage `<conswap> list`
 
   Arguments:
-    * `--verbose` (`-v`) - Display swap destination for each group in addition to other info.
+    * `--group` (`-g`) - name of group to list configs for (if `-g` is not present, `list` will list all configs)
 
 * `fix` - Fix broken 'group.toml'files
 
