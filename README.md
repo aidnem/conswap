@@ -90,4 +90,20 @@ The currently implemented commands are:
 
     > With `source` as `git`, conswap simply runs a `git clone` command to install the config. If a repo cannot be git cloned, it cannot be conswap installed.
 
+* `remove` - Remove a config from a group
+
+  Usage: `<conswap> remove <group> <config>`
+
+  Arguments:
+    * `<group>` - Which group to remove the config from
+    * `<config>` - Which config to remove from the group
+    * `--trash` (`-t`) - Permanently remove a config from the trash (after removing it from the group by running command without `-t`)
+
+* `restore` - Restore a removed config from the trash
+
+  Usage: `<conswap> restore <group> <config>`
+
+  Arguments:
+    * `<group>` - Which group the config was in
+    * `<config>` - The name of the config
 
