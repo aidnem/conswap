@@ -79,3 +79,15 @@ The currently implemented commands are:
     * `<group>` - Which group to swap configs for
     * `<config>` - Which config to swap to
 
+* `install` - Install a new config to a group
+
+  Usage: `<conswap> install <group> [source: local|git] <location>`
+
+  Arguments:
+    * `<group>` - Which group to install config into
+    * `source` - Either `local` or `git`: whether to install the config from the local filesystem or from a remote git repository
+    * `location` - Either the path to the local config, or the url of the remote git repo
+
+    > With `source` as `git`, conswap simply runs a `git clone` command to install the config. If a repo cannot be git cloned, it cannot be conswap installed.
+
+
