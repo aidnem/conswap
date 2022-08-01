@@ -15,8 +15,10 @@ import subprocess
 
 CONFIG_PATH_SUFFIX = ".config/conswap"
 GROUPS_SUFFIX = "groups"
+TRASH_SUFFIX = "trash"
 CONFIG_PATH = os.path.join(pathlib.Path.home(), CONFIG_PATH_SUFFIX)
 GROUPS_PATH = os.path.join(CONFIG_PATH, GROUPS_SUFFIX)
+TRASH_PATH = os.path.join(CONFIG_PATH, TRASH_SUFFIX)
 NOT_CONFIGURED = "NOT CONFIGURED"
 GROUP_CFG_FN = "group.toml"
 GROUP_CFG_DATA = {
@@ -36,8 +38,23 @@ def ensure_config_dir():
         if os.path.isdir(GROUPS_PATH):
             logging.debug("Created config and groups directories")
         else:
-            logging.critical(f"Failed to create config folder; exitting")
-            sys.exit()
+            logging.critical("Failed to create config folder; exiting")
+            sys.exit(1)
+
+def ensure_trash_dir():
+    """Ensure that the trash directory exists, and if not creates it"""
+    if os.path.isdir(TRASH_PATH):
+        logging.debug(f"Found {TRASH_PATH}")
+    else:
+        print(f"No trash directory was found, creating it in {TRASH_PATH}")
+
+        os.makedirs(TRASH_PATH)
+
+        if os.path.isdir(TRASH_PATH):
+            logging.debug("Created trash directory")
+        else:
+            logging.critical("Failed to create trash folder; exiting")
+            sys.exit(1)
 
 
 def confirm(prompt: str) -> bool:
@@ -192,30 +209,76 @@ def command_delete(name: str):
             f"Group {name} doesn't exist (no folder exists at {group_path})"
         )
 
-def command_list(verbose: bool):
+def dir_size(path: str):
+    total_size = 0
+    for dirpath, dirnames, filenames in os.walk(path):
+        for f in filenames:
+            fp = os.path.join(dirpath, f)
+            if not os.path.islink(fp):
+                total_size += os.path.getsize(fp)
+
+    return total_size
+
+def size_fmt(bytes: int):
+    size:float = float(bytes)
+    for unit in ["", "K", "M", "G", "T", "P", "E", "Z"]:
+        if abs(size) < 1024.0:
+            return f"{size:3.1f}{unit}B"
+        size /= 1024.0
+    return f"{size:.1f}YB"
+
+def command_list(group: str|None):
     """List all of the existing groups"""
-    for group in os.listdir(GROUPS_PATH):
+    if group is None:
+        for group in os.listdir(GROUPS_PATH):
+            if group == ".DS_Store": continue
+            group_path = os.path.join(GROUPS_PATH, group)
+            configs_count = 0
+            has_group_config = False
+            group_cfg_data = {"desc": "", "dest_path": NOT_CONFIGURED}
+            for config in os.listdir(group_path):
+                if config == "group.toml":
+                    has_group_config = True
+                    group_cfg_data = toml.load(os.path.join(group_path, "group.toml"))
+                else:
+                    configs_count += 1
+
+            msg = f"* {group}"
+            if (desc:=group_cfg_data['desc']) != "":
+                msg+= f" - {desc}"
+            msg += f" | {configs_count} config(s)"
+            msg += f" @ {group_path}"
+            msg += f" \N{RIGHTWARDS ARROW} swaps to {group_cfg_data['dest_path']}"
+
+            print(msg, end="")
+
+            if not has_group_config:
+                print(" | Warning: group is missing 'group.toml' file")
+            else:
+                print("") # Add the newline that we were missing from earlier
+    else:
         group_path = os.path.join(GROUPS_PATH, group)
-        configs_count = 0
-        has_group_config = False
         group_cfg_data = {"desc": "", "dest_path": NOT_CONFIGURED}
+        configs_count = 0
+        outstr = ""
         for config in os.listdir(group_path):
             if config == "group.toml":
                 has_group_config = True
                 group_cfg_data = toml.load(os.path.join(group_path, "group.toml"))
             else:
+                if config == ".DS_Store": continue
+                config_path = os.path.join(group_path, config)
+                config_size = dir_size(config_path)
+                outstr += f" * {config} @ {config_path} : {size_fmt(config_size)}\n"
                 configs_count += 1
 
-        msg = f"* {group} | desc: '{group_cfg_data['desc']}' | config(s): {configs_count}"
-        if verbose:
-            msg += f" | swap dest: '{group_cfg_data['dest_path']}'"
-
+        msg = group
+        if (desc:=group_cfg_data['desc']) != "":
+            msg+= f" - {desc}"
+        msg += f" \N{RIGHTWARDS ARROW} swaps to {group_cfg_data['dest_path']}"
+        msg += f"\n{configs_count} config(s):"
+        msg += f"\n{outstr}"
         print(msg, end="")
-
-        if not has_group_config:
-            print(" | Warning: group is missing 'group.toml' file")
-        else:
-            print("") # Add the newline that we were missing from earlier
 
 def command_fix(verbose: bool):
     """Fix missing fields in 'group.toml' files"""
@@ -387,6 +450,51 @@ def command_install(group: str, source: Literal["local"]|Literal["git"], locatio
         case _:
             assert False, f"Unreachable [install source {source}](please report this issue on github)"
 
+def command_remove(group: str, config: str, trash: bool):
+    if not trash:
+        print(f"Removing config {config} from group {group}")
+        config_path = os.path.join(GROUPS_PATH, group, config)
+        if not os.path.exists(config_path):
+            logging.critical(f"Config {config} doesn't exist in group {group}")
+            sys.exit(1)
+        trash_config_path = os.path.join(TRASH_PATH, f"deleted_{group}_{config}")
+        if os.path.exists(trash_config_path):
+            logging.critical(f"A deleted config already exists in trash at {trash_config_path}")
+            print(f"Please remove it with\n    $ [conswap] remove -t {group} {config}")
+            print("before trying to remove the current group")
+
+        confirm_call(shutil.move, config_path, trash_config_path)
+        print(f"Config was moved to {trash_config_path} (removed from group {group})")
+        print("Use the `restore` command to bring it back, or the `-p` flag to permanently remove it")
+    else:
+        if confirm(f"Are you sure you want to permanently remove config {config} from group {group} from trash? This action cannot be undone!"):
+            trash_config_path = os.path.join(TRASH_PATH, f"deleted_{group}_{config}")
+            if not os.path.exists(trash_config_path):
+                logging.critical(f"Config {config} for group {group} does not exist in trash (maybe it was permanently deleted?)")
+                print("If you have not yet deleted it from the group, try running")
+                print(f"    $ [conswap] remove {group} {config}")
+                print("and then running this command again")
+                sys.exit(1)
+            confirm_call(shutil.rmtree, trash_config_path)
+
+def command_restore(group: str, config: str):
+    group_path = os.path.join(GROUPS_PATH, group)
+    if not os.path.isdir(group_path):
+        logging.critical(f"Group {group} does not exist")
+        sys.exit(1)
+
+    config_path = os.path.join(group_path, config)
+    if os.path.exists(config_path):
+        logging.critical(f"Config {config} already exists in group {group} (maybe it was never removed?)")
+        sys.exit(1)
+    trash_config_path = os.path.join(TRASH_PATH, f"deleted_{group}_{config}")
+    if not os.path.exists(trash_config_path):
+        logging.critical(f"Config {config} for group {group} does not exist in trash (maybe it was permanently deleted?)")
+        sys.exit(1)
+
+    confirm_call(shutil.move, trash_config_path, config_path)
+    print(f"Successfully restored config {config} to group {group}")
+
 def main():
     ap = ArgumentParser(
         prog="conswap", description="manage and swap configuration files"
@@ -442,6 +550,12 @@ def main():
     list_parser = subparsers.add_parser(
         "list",
         help="list existing groups",
+    )
+
+    list_parser.add_argument(
+        "-g",
+        "--group",
+        help="group to list configs for (none means list groups)",
     )
 
     list_parser.add_argument(
@@ -511,6 +625,47 @@ def main():
         help="location of the config (path of file/folder or url of git repo)",
     )
 
+    remove_parser = subparsers.add_parser(
+        "remove",
+        help="remove a config from a group"
+    )
+
+    remove_parser.add_argument(
+        "group",
+        type=str,
+        help="which group to remove the config from"
+    )
+
+    remove_parser.add_argument(
+        "config",
+        type=str,
+        help="which config to remove from the group"
+    )
+
+    remove_parser.add_argument(
+        "-t",
+        "--trash",
+        action="store_true",
+        help="permanently remove a config you have already removed from its group from the trash"
+    )
+
+    restore_parser = subparsers.add_parser(
+        "restore",
+        help="restore a previously removed config from the trash"
+    )
+
+    restore_parser.add_argument(
+        "group",
+        type=str,
+        help="which group the removed config was in"
+    )
+
+    restore_parser.add_argument(
+        "config",
+        type=str,
+        help="name of the config"
+    )
+
     args = ap.parse_args()
 
     if args.debug:
@@ -524,6 +679,7 @@ def main():
     )
 
     ensure_config_dir()
+    ensure_trash_dir()
 
     try:
         match args.command:
@@ -532,7 +688,7 @@ def main():
             case "delete":
                 command_delete(args.name)
             case "list":
-                command_list(args.verbose)
+                command_list(args.group)
             case "fix":
                 command_fix(args.verbose)
             case "configure":
@@ -541,6 +697,10 @@ def main():
                 command_swap(args.group, args.config)
             case "install":
                 command_install(args.group, args.source, args.location)
+            case "remove":
+                command_remove(args.group, args.config, args.trash)
+            case "restore":
+                command_restore(args.group, args.config)
             case _:
                 assert False, f"Unreachable [command {args.command}](please report this issue on github)"
     except KeyError:

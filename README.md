@@ -50,12 +50,12 @@ The currently implemented commands are:
   Arguments:
     * `<name>` - the name of the group being deleted
 
-* `list` - List existing groups
+* `list` - List existing groups or configs in a group
 
   Usage `<conswap> list`
 
   Arguments:
-    * `--verbose` (`-v`) - Display swap destination for each group in addition to other info.
+    * `--group` (`-g`) - name of group to list configs for (if `-g` is not present, `list` will list all configs)
 
 * `fix` - Fix broken 'group.toml'files
 
@@ -78,4 +78,32 @@ The currently implemented commands are:
   Arguments:
     * `<group>` - Which group to swap configs for
     * `<config>` - Which config to swap to
+
+* `install` - Install a new config to a group
+
+  Usage: `<conswap> install <group> [source: local|git] <location>`
+
+  Arguments:
+    * `<group>` - Which group to install config into
+    * `source` - Either `local` or `git`: whether to install the config from the local filesystem or from a remote git repository
+    * `location` - Either the path to the local config, or the url of the remote git repo
+
+    > With `source` as `git`, conswap simply runs a `git clone` command to install the config. If a repo cannot be git cloned, it cannot be conswap installed.
+
+* `remove` - Remove a config from a group
+
+  Usage: `<conswap> remove <group> <config>`
+
+  Arguments:
+    * `<group>` - Which group to remove the config from
+    * `<config>` - Which config to remove from the group
+    * `--trash` (`-t`) - Permanently remove a config from the trash (after removing it from the group by running command without `-t`)
+
+* `restore` - Restore a removed config from the trash
+
+  Usage: `<conswap> restore <group> <config>`
+
+  Arguments:
+    * `<group>` - Which group the config was in
+    * `<config>` - The name of the config
 
