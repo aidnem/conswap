@@ -7,9 +7,10 @@ from argparse import ArgumentParser
 import os
 import pathlib
 import sys
-from typing import Callable
+from typing import Callable, Literal
 import toml
 import shutil
+import subprocess
 
 
 CONFIG_PATH_SUFFIX = ".config/conswap"
@@ -361,6 +362,31 @@ def command_swap(group: str, config: str):
     confirm_call(os.symlink, config_path, dest_path)
     print(f"Successfully swapped group {group} to config {config}")
 
+def command_install(group: str, source: Literal["local"]|Literal["git"], location: str):
+    group_path = os.path.join(GROUPS_PATH, group)
+    if not os.path.isdir(group_path):
+        logging.critical(f"Group {group} doesn't exist")
+        print("Run the 'list' to see existing groups")
+        print("or the 'new' command to create it")
+        return
+
+    install_under = input("What name should the group be installed under?\n> ")
+    install_path = os.path.join(group_path, install_under, "") # Add a trailing slash by joining with an empty string
+
+    if os.path.exists(install_path):
+        logging.critical(f"Group {group} already has a config named {install_under}")
+        print("Please remove it or choose a different name")
+        return
+
+    match source:
+        case "local":
+            location = expand_path_safe(location)
+            confirm_call(shutil.move, location, install_path)
+        case "git":
+            subprocess.run(["git", "clone", f"{location}", f"{install_path}"])
+        case _:
+            assert False, f"Unreachable [install source {source}](please report this issue on github)"
+
 def main():
     ap = ArgumentParser(
         prog="conswap", description="manage and swap configuration files"
@@ -427,7 +453,7 @@ def main():
 
     fix_parser = subparsers.add_parser(
         "fix",
-        help="automatically fill in missing fields in 'group.toml' files"
+        help="automatically fill in missing fields in 'group.toml' files",
     )
 
     fix_parser.add_argument(
@@ -455,12 +481,34 @@ def main():
 
     swap_parser.add_argument(
         "group",
-        help="name of the config group to swap"
+        help="name of the config group to swap",
     )
 
     swap_parser.add_argument(
         "config",
         help="name of the new config in the group to swap to"
+    )
+
+    install_parser = subparsers.add_parser(
+        "install",
+        help="install a new config to an existing group",
+    )
+
+    install_parser.add_argument(
+        "group",
+        help="name of the config group to install to",
+    )
+
+    install_parser.add_argument(
+        "source",
+        choices=["local", "git"],
+        help="source of the config (local files or a remote git repository)",
+    )
+
+    install_parser.add_argument(
+        "location",
+        type=str,
+        help="location of the config (path of file/folder or url of git repo)",
     )
 
     args = ap.parse_args()
@@ -491,6 +539,8 @@ def main():
                 command_configure(args.name)
             case "swap":
                 command_swap(args.group, args.config)
+            case "install":
+                command_install(args.group, args.source, args.location)
             case _:
                 assert False, f"Unreachable [command {args.command}](please report this issue on github)"
     except KeyError:
