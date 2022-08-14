@@ -210,14 +210,17 @@ def command_delete(name: str):
         )
 
 def dir_size(path: str):
-    total_size = 0
-    for dirpath, dirnames, filenames in os.walk(path):
-        for f in filenames:
-            fp = os.path.join(dirpath, f)
-            if not os.path.islink(fp):
-                total_size += os.path.getsize(fp)
+    if os.path.isdir(path):
+        total_size = 0
+        for dirpath, dirnames, filenames in os.walk(path):
+            for f in filenames:
+                fp = os.path.join(dirpath, f)
+                if not os.path.islink(fp):
+                    total_size += os.path.getsize(fp)
 
-    return total_size
+        return total_size
+    else:
+        return os.path.getsize(path)
 
 def size_fmt(bytes: int):
     size:float = float(bytes)
