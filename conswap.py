@@ -425,6 +425,76 @@ def command_swap(group: str, config: str):
     confirm_call(os.symlink, config_path, dest_path)
     print(f"Successfully swapped group {group} to config {config}")
 
+def command_unswap(group: str):
+    """Swap a group to no config (delete symlink for a group)"""
+    print(f"Unswapping group '{group}' (removing symlinked config)")
+    validate_name(group)
+    group_path = os.path.join(GROUPS_PATH, group)
+    if not os.path.isdir(group_path):
+        logging.critical(f"Group {group} doesn't exist")
+        print("Run the 'list' to see existing groups")
+        print("or the 'new' command to create it")
+        return
+
+    group_cfg_path = os.path.join(group_path, "group.toml")
+
+    group_cfg_data = toml.load(group_cfg_path)
+    if not "dest_path" in group_cfg_data:
+        logging.critical(f"Field 'dest_path' is not defined in group.toml")
+        print(f"Please set it in {group_cfg_path}")
+        print("exitting.")
+        return
+    dest_path = group_cfg_data["dest_path"]
+    if dest_path == NOT_CONFIGURED:
+        logging.critical(f"Field 'dest_path' is not configured in group.toml")
+        print(f"Please set it in {group_cfg_path}")
+        print("exitting.")
+        return
+    if os.path.exists(dest_path):
+        if os.path.islink(dest_path):
+            print("Found swapped config. Unswapping it.")
+            confirm_call(os.unlink, dest_path)
+            print(f"Successfully unlinked config for group {group}")
+        else:
+            print("Config already exists at destination path (not a symlink)")
+            chosen = False
+            while not chosen:
+                choice = input(
+                    "(i)nstall existing config into groups folder, (d)elete "
+                    "the existing file/folder, or (a)bort?"
+                )
+                match choice.lower():
+                    case "i":
+                        chosen = True
+                        name_valid = False
+                        current_name = ""
+                        while not name_valid:
+                            current_name = input(
+                                "What should this config be installed as?\n>"
+                            )
+                            name_valid = validate_name(current_name, auto_exit=False)
+
+                        installed_path = os.path.join(group_path, current_name)
+                        confirm_call(shutil.move, dest_path, installed_path)
+                        print(f"Successfully installed config '{current_name}' to group '{group}'")
+                    case "d":
+                        chosen = True
+                        confirm_call(shutil.rmtree, dest_path)
+                        print("Successfully deleted existing config")
+                    case "a":
+                        chosen = True
+                        print("Aborting\n"
+                            "WARNING: Aborting now leaves a group config behind.\n"
+                            "There is a file at this config's destination, \n"
+                            " causing it to error if used.\n"
+                            "Delete/move the config or run this command again\n"
+                            " to choose another option.\n" 
+                        )
+
+                    case "_":
+                        print("Please choose i, d, or a")
+
+
 def command_install(group: str, source: Literal["local"]|Literal["git"], location: str):
     group_path = os.path.join(GROUPS_PATH, group)
     if not os.path.isdir(group_path):
@@ -600,7 +670,18 @@ def main():
 
     swap_parser.add_argument(
         "config",
-        help="name of the new config in the group to swap to"
+        help="name of the new config in the group to swap to",
+    )
+
+    unswap_parser = subparsers.add_parser(
+        "unswap",
+        help="swap a group to no config"
+    )
+
+    unswap_parser.add_argument(
+        "group",
+        help="the name of the config group to unswap",
+        type=str,
     )
 
     install_parser = subparsers.add_parser(
@@ -695,6 +776,8 @@ def main():
                 command_configure(args.name)
             case "swap":
                 command_swap(args.group, args.config)
+            case "unswap":
+                command_unswap(args.group)
             case "install":
                 command_install(args.group, args.source, args.location)
             case "remove":
